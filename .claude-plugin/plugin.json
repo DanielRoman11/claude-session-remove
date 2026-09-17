@@ -1,6 +1,6 @@
 {
   "name": "session-cleanup",
-  "description": "Delete Claude Code session transcripts (the current session or one matched by name) directly from the CLI",
+  "description": "Delete Claude Code session transcripts (the current session or one matched by name) via a standalone Go binary or the /delete-session command",
   "version": "1.0.0",
   "author": {
     "name": "Daniel Roman",

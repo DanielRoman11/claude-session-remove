@@ -1,23 +1,26 @@
 # Session Cleanup Plugin
 
-Delete Claude Code session transcripts from a plain terminal, no AI turn involved.
+Delete Claude Code session transcripts, either from a plain terminal (zero tokens) or with a `/delete-session` command inside Claude Code (minimal, deterministic).
 
 ## Overview
 
-Sessions can only be created, resumed, and cleared today — there's no way to permanently remove one. This plugin ships `claude-delete-session`, a self-contained bash script that finds and deletes a session's transcript file for you, with confirmation, so leftover test sessions (or ones containing sensitive data) don't have to be cleaned up by hand in `~/.claude/projects/`.
+Sessions can only be created, resumed, and cleared today — there's no way to permanently remove one. This plugin ships `claude-delete-session`, a small Go binary that finds and deletes a session's transcript file for you, with confirmation, so leftover test sessions (or ones containing sensitive data) don't have to be cleaned up by hand in `~/.claude/projects/`.
 
-It is a plain script on purpose: it runs entirely outside Claude, so deleting a session costs zero tokens and works from any terminal, not just from inside a live session.
+Two ways to use it:
+
+- **Standalone, in any terminal:** run the binary directly. No Claude process involved, no tokens spent, full interactive picker.
+- **`/delete-session` inside Claude Code:** the command runs the same binary in a non-interactive mode and only asks you two things (which session, and to confirm) through Claude Code's own UI — it does not reason about parsing sessions itself, that logic lives entirely in the binary.
 
 ## Install
 
 ```bash
-cp plugins/session-cleanup/scripts/delete-session.sh ~/.local/bin/claude-delete-session
-chmod +x ~/.local/bin/claude-delete-session
+cd plugins/session-cleanup
+go build -o ~/.local/bin/claude-delete-session .
 ```
 
-Make sure `~/.local/bin` (or wherever you copy it) is on your `PATH`.
+Make sure `~/.local/bin` (or wherever you put the binary) is on your `PATH`. For the `/delete-session` command, also copy `commands/delete-session.md` into `~/.claude/commands/` (or install the plugin through Claude Code's plugin system).
 
-## Usage
+## Usage: standalone (terminal)
 
 ### `claude-delete-session`
 
@@ -48,23 +51,39 @@ Session deleted.
 - **Multiple matches:** shows the same numbered picker, scoped to the matches.
 - **No match:** prints `No session found matching "<name>"` and exits.
 
-After a confirmed deletion, it hands off straight into `claude --resume` (via `exec`, replacing the script process) so you land on the picker for your remaining sessions instead of being left at a bare shell, and you never see the transcript you just deleted since its file is already gone.
+After a confirmed deletion, it hands off straight into `claude --resume` (via `exec`, replacing the process) so you land on the picker for your remaining sessions, and you never see the transcript you just deleted since its file is already gone.
+
+## Usage: `/delete-session` inside Claude Code
+
+```
+> /delete-session
+> /delete-session db-migration
+```
+
+Behind the scenes this runs `claude-delete-session --list` to read the sessions (no prompts), resolves your target, asks you to pick/confirm through Claude Code's own question UI (a real shell `y/n` prompt can't be answered from inside a tool call — there's no attached tty), then runs `claude-delete-session --id <id> --yes --no-resume` to actually delete. It does not chain into `claude --resume` itself; use Claude Code's own `/resume` afterward if you want to switch sessions.
+
+## Non-interactive flags
+
+For scripting or the `/delete-session` command:
+
+- `--list` — print `id<TAB>title<TAB>is_current<TAB>mtime` for every session, no prompts.
+- `--id <id> --yes [--no-resume]` — delete that exact session id without any prompt.
 
 ## How it works
 
-Claude Code stores each session as a `.jsonl` transcript under `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`. The script:
+Claude Code stores each session as a `.jsonl` transcript under `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`. The binary:
 
 1. Lists the `.jsonl` files for the current project directory.
 2. Derives a display title per session from its `ai-title` entries (falling back to the first user message).
-3. Resolves your target: every session (no argument), or a name/id match.
-4. Asks for confirmation before deleting anything.
-5. Removes only the confirmed file with `rm`.
-6. Runs `exec claude --resume` so you're immediately back in a picker.
+3. Resolves your target: every session (no argument), a name/id match, or an explicit `--id`.
+4. Asks for confirmation before deleting anything (unless `--yes`).
+5. Removes only the confirmed file.
+6. In interactive mode, execs `claude --resume` unless `--no-resume` was passed.
 
 ## Limitations
 
 - Only the transcript file is removed; it does not search for or delete other unrelated Claude Code state.
-- Requires `claude` on your `PATH` for the resume hand-off; if it's missing, the script just reports the deletion and exits instead.
+- The resume hand-off requires `claude` on `PATH`; if it's missing, it just reports the deletion and exits instead.
 
 ## Author
 
