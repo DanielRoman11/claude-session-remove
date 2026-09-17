@@ -1,27 +1,37 @@
-# claude-session-remove
+# ctxhub
 
-Delete Claude Code session transcripts, either from a plain terminal (zero tokens, full TUI) or with a `/csr` command inside Claude Code (minimal, deterministic).
+A TUI to browse, resume, and delete your AI coding sessions — across Claude Code, OpenCode, and Kimi Code — from one place.
 
 ## Overview
 
-Sessions can only be created, resumed, and cleared today — there's no way to permanently remove one. This project ships `csr`, a small Go binary that finds and deletes a session's transcript file for you, with confirmation, so leftover test sessions (or ones containing sensitive data) don't have to be cleaned up by hand in `~/.claude/projects/`.
+Every one of these tools keeps its own session history, with its own picker, its own storage format, and no way to see them side by side. `ctxhub` lists all of them for the current project directory in a single full-screen picker, sorted by recency, each tagged with its own icon, so you can jump back into any session (whichever tool it belongs to) or clean up old ones without hunting through three different pickers.
+
+```
+╭──────────────────────────────────────────────────────────────────╮
+│ ctxhub  3 sessions found                                          │
+│                                                                    │
+│ ›  ✳ Sep 16  Fix the very very long authe…  ● current  2h ago     │
+│    ◆ Sep 15  Old experiment                            1d ago     │
+│    ✦ Sep 13  Db migration test                         3d ago     │
+│                                                                    │
+│  ↑/↓ navigate    enter/o open    d delete    q quit               │
+╰──────────────────────────────────────────────────────────────────╯
+```
 
 Two ways to use it:
 
-- **Standalone, in any terminal:** run `csr`. No Claude process involved, no tokens spent, a full-screen picker built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lipgloss](https://github.com/charmbracelet/lipgloss), styled after Claude Code's own palette.
-- **`/csr` inside Claude Code:** the command runs the same binary in a non-interactive mode and only asks you two things (which session, and to confirm) through Claude Code's own UI — it does not reason about parsing sessions itself, that logic lives entirely in the binary.
+- **Standalone, in any terminal:** run `ctxhub`. No tokens spent, a full-screen picker built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lipgloss](https://github.com/charmbracelet/lipgloss), styled after Claude Code's own palette (each provider gets its own accent color).
+- **`/ctxhub` inside Claude Code:** the command runs the same binary in a non-interactive mode and only asks you two things (which session, and to confirm) through Claude Code's own UI.
 
-```
-╭──────────────────────────────────────────────╮
-│ Claude Code Sessions  3 found                 │
-│                                                │
-│ ›  Fix auth flow                    2h ago    │
-│    Old experiment    ● current      1d ago    │
-│    Db migration test                3d ago    │
-│                                                │
-│ ↑/↓ navigate    enter/d delete    q quit       │
-╰──────────────────────────────────────────────╯
-```
+### Supported providers
+
+| Provider | Icon | List/delete via | Notes |
+|---|---|---|---|
+| Claude Code | ✳ | reads `~/.claude/projects/<cwd>/*.jsonl` directly | |
+| OpenCode | ◆ | shells out to `opencode session list/delete` | uses OpenCode's own CLI, never touches its sqlite db directly |
+| Kimi Code | ✦ | reads `~/.kimi-code/session_index.jsonl` + `state.json` | best-effort: written from Kimi Code's docs, not verified against a live install. If your sessions don't show up, please open an issue with what `~/.kimi-code/session_index.jsonl` looks like |
+
+A provider whose CLI isn't installed (or that has no sessions for the current directory) is silently skipped — you'll just see the others.
 
 ## Install
 
@@ -30,26 +40,26 @@ Two ways to use it:
 Downloads a prebuilt binary for your OS/architecture, verifies its checksum, and installs it — nothing to compile.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/DanielRoman11/claude-session-remove/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/DanielRoman11/ctxhub/main/install.sh | bash
 ```
 
 Step by step, this does:
 
 1. Detects your OS and architecture (linux/darwin, amd64/arm64).
-2. Downloads the matching `csr` binary from the [latest release](https://github.com/DanielRoman11/claude-session-remove/releases/latest).
+2. Downloads the matching `ctxhub` binary from the [latest release](https://github.com/DanielRoman11/ctxhub/releases/latest).
 3. Downloads `checksums.txt` from that same release and verifies the download's `sha256` before touching anything else.
-4. Extracts and installs the binary to `~/.local/bin/csr` (override with `CSR_INSTALL_DIR=/some/dir`).
-5. If `~/.claude/commands/` already exists, it also drops `csr.md` there so `/csr` works right away (set `CSR_INSTALL_COMMAND=1` to force this even without a `~/.claude` directory, or skip it and see "The `/csr` command" below).
+4. Extracts and installs the binary to `~/.local/bin/ctxhub` (override with `CTXHUB_INSTALL_DIR=/some/dir`).
+5. If `~/.claude/commands/` already exists, it also drops `ctxhub.md` there so `/ctxhub` works right away (set `CTXHUB_INSTALL_COMMAND=1` to force this even without a `~/.claude` directory).
 6. Prints a `PATH` reminder if `~/.local/bin` isn't on it yet.
 
 Prefer to read the script before running it? It's right here: [`install.sh`](install.sh).
 
-To install a specific version instead of latest: `CSR_VERSION=v1.0.0 curl -fsSL .../install.sh | bash`.
+To install a specific version instead of latest: `CTXHUB_VERSION=v2.0.0 curl -fsSL .../install.sh | bash`.
 
 ### Option B: Go toolchain
 
 ```bash
-go install github.com/DanielRoman11/claude-session-remove/cmd/csr@latest
+go install github.com/DanielRoman11/ctxhub/cmd/ctxhub@latest
 ```
 
 Make sure `$(go env GOPATH)/bin` is on your `PATH`.
@@ -57,86 +67,88 @@ Make sure `$(go env GOPATH)/bin` is on your `PATH`.
 ### Option C: build from source
 
 ```bash
-git clone https://github.com/DanielRoman11/claude-session-remove
-cd claude-session-remove
-go build -o ~/.local/bin/csr ./cmd/csr
+git clone https://github.com/DanielRoman11/ctxhub
+cd ctxhub
+go build -o ~/.local/bin/ctxhub ./cmd/ctxhub
 ```
 
-### The `/csr` command (optional)
+### The `/ctxhub` command (optional)
 
-The curl installer above already does this for you when `~/.claude/commands/` exists. To do it by hand instead, copy `commands/csr.md` into `~/.claude/commands/`:
+The curl installer above already does this for you when `~/.claude/commands/` exists. To do it by hand instead:
 
 ```bash
 mkdir -p ~/.claude/commands
-curl -fsSL https://raw.githubusercontent.com/DanielRoman11/claude-session-remove/main/commands/csr.md \
-  -o ~/.claude/commands/csr.md
+curl -fsSL https://raw.githubusercontent.com/DanielRoman11/ctxhub/main/commands/ctxhub.md \
+  -o ~/.claude/commands/ctxhub.md
 ```
 
 or install this as a Claude Code plugin (`.claude-plugin/plugin.json` is already set up for that).
 
 ## Usage: standalone (terminal)
 
-1. `cd` into any project directory you've used with Claude Code.
+1. `cd` into any project directory you've used with Claude Code, OpenCode, or Kimi Code.
 2. Run:
    ```bash
-   csr
+   ctxhub
    ```
-3. A full-screen picker opens listing that project's sessions, most recent first, with the current one tagged `● current`.
+3. A full-screen picker opens listing every session for that directory across all installed providers, most recent first — each row shows the provider's icon, the date it was opened (when available), the title, and how long ago it was last touched, right-aligned in a muted color.
 4. Move the selection with `↑`/`↓` (or `j`/`k`).
-5. Press `enter` or `d` on a session to open the delete confirmation.
-6. Press `y` to delete, or `n`/`esc` to cancel and go back to the list.
-7. On confirmed delete:
-   - if it wasn't the active session, `csr` hands off straight into `claude --resume` (via `exec`) so you land on the picker for your remaining sessions;
-   - if it *was* the active session, it prints a warning instead and does not resume (see "How it works").
-8. Press `q` at any time to quit without deleting anything.
+5. Press `enter` or `o` to **open/resume** that exact session in its original tool (execs straight into it, replacing this process).
+6. Press `d` to **delete** instead: opens a confirm dialog.
+7. On the confirm dialog, press `y` to delete or `n`/`esc` to cancel and go back to the list.
+8. On a confirmed delete:
+   - if it wasn't the active Claude Code session, `ctxhub` hands off into that provider's own continuation UI (e.g. `claude --resume`'s picker) so you land on your remaining sessions;
+   - if it *was* the active Claude Code session, it prints a warning instead and does not relaunch (see "How it works").
+9. Press `q` at any time to quit without doing anything.
 
 You can also jump straight to a session instead of browsing the full list:
 
 ```bash
-csr db-migration
+ctxhub db-migration
 ```
 
-- **One match** for the title/id substring: goes straight to the confirm dialog (step 5 above).
+- **One match** for the title/id substring: goes straight to the delete confirm dialog.
 - **Multiple matches**: opens the picker, scoped to just those matches.
 - **No match**: prints `No session found matching "db-migration"` and exits.
 
-If stdin/stdout isn't a real terminal (piped, redirected, scripted), `csr` falls back to a plain numbered prompt instead of the TUI — no extra setup needed.
+If stdin/stdout isn't a real terminal (piped, redirected, scripted), `ctxhub` falls back to a plain numbered delete prompt instead of the TUI — no extra setup needed.
 
-## Usage: `/csr` inside Claude Code
+## Usage: `/ctxhub` inside Claude Code
 
 1. Inside a Claude Code session, type:
    ```
-   /csr
+   /ctxhub
    ```
-   to target the current session, or `/csr <name>` to match a different one by title/id.
-2. Claude runs `csr --list` behind the scenes (no prompts) and resolves your target.
+   to target the current session, or `/ctxhub <name>` to match a different one by title/id (across any provider).
+2. Claude runs `ctxhub --list` behind the scenes (no prompts) and resolves your target.
 3. If there's more than one match, Claude asks you to pick one via its own question UI.
 4. Claude asks you to confirm the deletion (yes/no) the same way.
-5. On yes, it runs `csr --id <id> --yes --no-resume` and reports the result in one line.
-6. It does **not** chain into `claude --resume` itself (there's no tty inside a tool call to drive that hand-off) — run Claude Code's own `/resume` afterward if you want to switch sessions.
+5. On yes, it runs `ctxhub --id <provider>:<id> --yes --no-resume` and reports the result in one line.
+6. It does **not** relaunch anything itself (there's no tty inside a tool call to drive that hand-off) — use `/resume` (Claude Code) or reopen the relevant tool afterward if you want to switch sessions.
 
 ## Non-interactive flags
 
-For scripting or the `/csr` command:
+For scripting or the `/ctxhub` command:
 
-- `--list` — print `id<TAB>title<TAB>is_current<TAB>mtime` for every session, no prompts, no TUI.
-- `--id <id> --yes [--no-resume]` — delete that exact session id without any prompt.
+- `--list` — print `provider_slug<TAB>id<TAB>provider_name<TAB>title<TAB>is_current<TAB>updated_unix` for every session, no prompts, no TUI.
+- `--id <provider_slug>:<id> --yes [--no-resume]` — delete that exact session without any prompt.
 
 ## How it works
 
-Claude Code stores each session as a `.jsonl` transcript under `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`. The binary:
+Each provider is a small adapter behind a common interface (`List`, `Delete`, `Resume`, `Relaunch` — see `internal/agents/`):
 
-1. Lists the `.jsonl` files for the current project directory.
-2. Derives a display title per session from its `ai-title` entries (falling back to the first user message).
-3. Resolves your target: every session (no argument), a name/id match, or an explicit `--id`.
-4. Asks for confirmation before deleting anything (unless `--yes`).
-5. Removes only the confirmed file.
-6. In interactive mode, execs `claude --resume` unless `--no-resume` was passed.
+- **Claude Code**: lists the `.jsonl` transcripts under `~/.claude/projects/<encoded-cwd>/`, deriving title and timestamps from each entry's `timestamp` field (falling back to file mtime). Delete removes the file. Resume/relaunch exec `claude --resume [id]`.
+- **OpenCode**: shells out to `opencode session list --format json` and `opencode session delete <id>` — no direct database access, so it stays correct across OpenCode's own schema changes. Resume/relaunch exec `opencode --session <id>` / bare `opencode`.
+- **Kimi Code**: reads the `session_index.jsonl` index and each session's `state.json`, matching fields by substring rather than exact key name since the schema isn't verified against a live install. Delete removes the session's directory. Resume/relaunch exec `kimi --session [id]`.
+
+Relaunching after a delete is skipped if the deleted session was the currently active Claude Code one: `claude --resume` with no explicit id can fall back to the most recently active session — the one you just deleted — and Claude Code would recreate a blank transcript under that same id. In that case `ctxhub` just tells you to exit and start fresh instead.
 
 ## Limitations
 
-- Only the transcript file is removed; it does not search for or delete other unrelated Claude Code state.
-- The resume hand-off requires `claude` on `PATH`; if it's missing, it just reports the deletion and exits instead.
+- Only the session record itself is removed; this doesn't search for or delete other unrelated state from these tools.
+- "Current session" detection only works for Claude Code (via `CLAUDE_CODE_SESSION_ID`, set when running inside a Claude Code session) — OpenCode and Kimi Code sessions are never tagged `current`.
+- Relaunching requires the corresponding CLI (`claude`, `opencode`, `kimi`) on `PATH`; if it's missing, `ctxhub` reports the deletion and exits instead.
+- The Kimi Code adapter is unverified against a real installation — please report issues.
 
 ## Author
 
@@ -144,4 +156,4 @@ Daniel Roman
 
 ## Version
 
-1.0.0
+2.0.0

@@ -36,13 +36,13 @@ jobs:
           CGO_ENABLED: 0
         run: |
           mkdir -p dist
-          go build -trimpath -ldflags "-s -w" -o dist/csr ./cmd/csr
-          tar -C dist -czf csr_${{ matrix.os }}_${{ matrix.arch }}.tar.gz csr
+          go build -trimpath -ldflags "-s -w" -o dist/ctxhub ./cmd/ctxhub
+          tar -C dist -czf ctxhub_${{ matrix.os }}_${{ matrix.arch }}.tar.gz ctxhub
 
       - uses: actions/upload-artifact@v4
         with:
-          name: csr_${{ matrix.os }}_${{ matrix.arch }}
-          path: csr_${{ matrix.os }}_${{ matrix.arch }}.tar.gz
+          name: ctxhub_${{ matrix.os }}_${{ matrix.arch }}
+          path: ctxhub_${{ matrix.os }}_${{ matrix.arch }}.tar.gz
 
   release:
     needs: build

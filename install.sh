@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Installs the csr binary (claude-session-remove) from a prebuilt GitHub
-# release, verifies its checksum, and optionally installs the /csr command
-# for Claude Code.
+# Installs the ctxhub binary from a prebuilt GitHub release, verifies its
+# checksum, and optionally installs the /ctxhub command for Claude Code.
 #
-#   curl -fsSL https://raw.githubusercontent.com/DanielRoman11/claude-session-remove/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/DanielRoman11/ctxhub/main/install.sh | bash
 set -euo pipefail
 
-REPO="DanielRoman11/claude-session-remove"
-BIN_NAME="csr"
-INSTALL_DIR="${CSR_INSTALL_DIR:-$HOME/.local/bin}"
-VERSION="${CSR_VERSION:-latest}"
+REPO="DanielRoman11/ctxhub"
+BIN_NAME="ctxhub"
+INSTALL_DIR="${CTXHUB_INSTALL_DIR:-$HOME/.local/bin}"
+VERSION="${CTXHUB_VERSION:-latest}"
 
 log() { printf '%s\n' "$*" >&2; }
 die() { log "error: $*"; exit 1; }
@@ -75,13 +74,13 @@ case ":${PATH}:" in
      log "  export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
 esac
 
-if [ -d "$HOME/.claude/commands" ] || [ "${CSR_INSTALL_COMMAND:-}" = "1" ]; then
+if [ -d "$HOME/.claude/commands" ] || [ "${CTXHUB_INSTALL_COMMAND:-}" = "1" ]; then
   mkdir -p "$HOME/.claude/commands"
-  cmd_url="https://raw.githubusercontent.com/$REPO/main/commands/csr.md"
-  if curl -fsSL "$cmd_url" -o "$HOME/.claude/commands/csr.md"; then
-    log "Installed the /csr command to $HOME/.claude/commands/csr.md"
+  cmd_url="https://raw.githubusercontent.com/$REPO/main/commands/ctxhub.md"
+  if curl -fsSL "$cmd_url" -o "$HOME/.claude/commands/ctxhub.md"; then
+    log "Installed the /ctxhub command to $HOME/.claude/commands/ctxhub.md"
   else
-    log "Note: could not fetch the /csr command file; skipping (the binary still works standalone)"
+    log "Note: could not fetch the /ctxhub command file; skipping (the binary still works standalone)"
   fi
 fi
 

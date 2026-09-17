@@ -1,4 +1,4 @@
-module github.com/DanielRoman11/claude-session-remove
+module github.com/DanielRoman11/ctxhub
 
 go 1.25.0
 
