@@ -7,16 +7,22 @@ A TUI to browse, resume, and delete your AI coding sessions — across Claude Co
 Every one of these tools keeps its own session history, with its own picker, its own storage format, and no way to see them side by side. `ctxhub` lists all of them for the current project directory in a single full-screen picker, sorted by recency, each tagged with its own icon, so you can jump back into any session (whichever tool it belongs to) or clean up old ones without hunting through three different pickers.
 
 ```
-╭──────────────────────────────────────────────────────────────────╮
-│ ctxhub  3 sessions found                                          │
-│                                                                    │
-│ ›  ✳ Sep 16  Fix the very very long authe…  ● current  2h ago     │
-│    ◆ Sep 15  Old experiment                            1d ago     │
-│    ✦ Sep 13  Db migration test                         3d ago     │
-│                                                                    │
-│  ↑/↓ navigate    enter/o open    d delete    q quit               │
-╰──────────────────────────────────────────────────────────────────╯
+╭─ ctxhub ───────────────────────────────────────────────── 3 sessions ─╮
+│ › ✻ Fix the very very long authentication flow bug in login          │
+│    Claude Code · Sep 16 · current                          2h ago    │
+│                                                                       │
+│   ▦ Old experiment                                                   │
+│    OpenCode · Sep 15                                        1d ago   │
+│                                                                       │
+│   ☾ Db migration test                                                │
+│    Kimi Code · Sep 13                                       3d ago   │
+│                                                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│ ↑/↓ navigate    enter/o open    d delete    q quit                   │
+╰─────────────────────────────────────────────────────────────────────╯
 ```
+
+The panel fills the whole terminal (this is trimmed to fit here). Each session is a two-line card: title on top, provider + opened date + current tag on the line below, time-since-last-touched right-aligned in a muted color. Icons are the closest single-glyph match to each tool's real mark: a sunburst for Claude Code, a modular pixel-block grid for OpenCode, a crescent moon for Kimi Code (Moonshot AI's name literally means "the dark side of the moon").
 
 Two ways to use it:
 
@@ -156,4 +162,4 @@ Daniel Roman
 
 ## Version
 
-2.0.0
+2.1.0
