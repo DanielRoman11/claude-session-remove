@@ -1,0 +1,9 @@
+{
+  "name": "session-cleanup",
+  "description": "Delete Claude Code session transcripts (the current session or one matched by name) directly from the CLI",
+  "version": "1.0.0",
+  "author": {
+    "name": "Daniel Roman",
+    "email": "danielroman11@users.noreply.github.com"
+  }
+}
