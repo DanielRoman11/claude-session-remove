@@ -61,6 +61,34 @@ Claude Code stores each session as a `.jsonl` transcript under `~/.claude/projec
 
 - Must be run from within a Claude Code session (for the "current session" mode).
 
+## Standalone script (no AI loop needed)
+
+The `/delete-session` command above works by asking Claude to run the lookup and confirm with you, which costs a model turn. For a plain terminal alternative, `scripts/delete-session.sh` implements the same logic as a self-contained bash script with real interactive prompts, no Claude session required:
+
+```
+$ claude-delete-session
+Sessions for this project:
+  1. Fix auth flow [f3a1...b2]
+  2. Old experiment [9c02...ee] (current)
+  3. Db migration test [11ab...44]
+Select a session to delete (1-3, or Enter to cancel): 3
+Delete session "Db migration test" (~/.claude/projects/.../11ab....jsonl)? (y/N) y
+Session deleted.
+
+$ claude-delete-session db-migration
+Delete session "Db migration test" (~/.claude/projects/.../11ab....jsonl)? (y/N) y
+Session deleted.
+```
+
+With no argument it lists every session for the current project directory (marking the current one, if any) and lets you pick a number, just like `claude --resume` does for resuming. With an argument it filters first by title/id substring.
+
+To install it on your `PATH`:
+
+```bash
+cp plugins/session-cleanup/scripts/delete-session.sh ~/.local/bin/claude-delete-session
+chmod +x ~/.local/bin/claude-delete-session
+```
+
 ## Author
 
 Daniel Roman
