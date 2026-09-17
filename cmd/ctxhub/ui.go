@@ -13,27 +13,29 @@ import (
 // Claude Code's own palette: a warm terracotta accent over neutral stone
 // grays, adapted for both light and dark terminals. Each other provider
 // gets its own accent so its sessions are recognizable at a glance.
+//
+// Icons are the closest single-glyph approximation of each tool's real
+// mark, not arbitrary shapes: Claude's is a spoked sunburst/asterisk,
+// OpenCode's is a modular pixel-block grid, Kimi Code's leans on Moonshot
+// AI's own moon branding (their Chinese name literally means "the dark
+// side of the moon").
 var (
 	colorAccent   = lipgloss.AdaptiveColor{Light: "#C2410C", Dark: "#DA7756"}
 	colorOpenCode = lipgloss.AdaptiveColor{Light: "#0E7490", Dark: "#22D3EE"}
-	colorKimi     = lipgloss.AdaptiveColor{Light: "#7E22CE", Dark: "#C084FC"}
+	colorKimi     = lipgloss.AdaptiveColor{Light: "#475569", Dark: "#94A3B8"}
 	colorText     = lipgloss.AdaptiveColor{Light: "#292524", Dark: "#E7E5E4"}
 	colorMuted    = lipgloss.AdaptiveColor{Light: "#78716C", Dark: "#A8A29E"}
 	colorFaint    = lipgloss.AdaptiveColor{Light: "#D6D3D1", Dark: "#57534E"}
 	colorDanger   = lipgloss.AdaptiveColor{Light: "#B91C1C", Dark: "#E5484D"}
 	colorOnAcc    = lipgloss.AdaptiveColor{Light: "#FFFBEB", Dark: "#1C1917"}
 
+	borderStyle   = lipgloss.NewStyle().Foreground(colorAccent)
 	appTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(colorAccent)
 	subtitleStyle = lipgloss.NewStyle().Foreground(colorMuted)
 
-	boxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorAccent).
-			Padding(1, 2)
-
 	cursorStyle = lipgloss.NewStyle().Bold(true).Foreground(colorAccent)
 
-	itemStyle = lipgloss.NewStyle().Foreground(colorText)
+	itemStyle = lipgloss.NewStyle().Foreground(colorText).Bold(true)
 
 	selectedItemStyle = lipgloss.NewStyle().
 				Bold(true).
@@ -41,19 +43,16 @@ var (
 				Background(colorAccent)
 
 	currentTagStyle = lipgloss.NewStyle().Foreground(colorAccent).Italic(true)
-	dateStyle       = lipgloss.NewStyle().Foreground(colorMuted)
+	metaStyle       = lipgloss.NewStyle().Foreground(colorMuted)
 	timeStyle       = lipgloss.NewStyle().Foreground(colorFaint)
 	dimStyle        = lipgloss.NewStyle().Foreground(colorMuted)
 
 	helpKeyStyle  = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	helpDescStyle = lipgloss.NewStyle().Foreground(colorMuted)
 
-	dialogTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(colorDanger)
+	buttonStyle = lipgloss.NewStyle().Padding(0, 2).MarginRight(2).Foreground(colorMuted)
 
-	buttonStyle = lipgloss.NewStyle().Padding(0, 3).MarginRight(2).
-			Border(lipgloss.RoundedBorder()).BorderForeground(colorFaint).Foreground(colorMuted)
-
-	buttonDangerStyle = lipgloss.NewStyle().Padding(0, 3).MarginRight(2).Bold(true).
+	buttonDangerStyle = lipgloss.NewStyle().Padding(0, 2).MarginRight(2).Bold(true).
 				Foreground(colorOnAcc).Background(colorDanger)
 
 	successStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#15803D", Dark: "#4ADE80"})
@@ -152,20 +151,18 @@ func (m model) View() string {
 	}
 }
 
-// listInnerWidth is the fixed width of a row's text (icon + date + title +
-// time), so the time column lands flush right and stays put as the cursor
-// moves between rows of different title lengths.
-const listInnerWidth = 58
-
-// iconColWidth reserves the provider icon plus a one-space gap.
-const iconColWidth = 2
-
-// dateColWidth reserves the "Jan 2"-style opened date plus a gap.
-const dateColWidth = 8
-
-// timeColWidth reserves the widest relTime() output ("59m ago", "23h ago",
-// "29d ago") plus a one-space gap before it.
-const timeColWidth = 8
+// Layout constants for a session card:
+//
+//	✳  Fix the very very long authentication flow bug
+//	   Claude Code · Sep 16 · current                        2h ago
+//
+// gutter (cursor marker) + icon + space line up the title on row 1; the
+// same width of plain indent lines up the meta row underneath it.
+const (
+	gutterWidth  = 4 // "› " or "  " (2) + icon (1) + space (1)
+	timeColWidth = 8 // widest relTime() output ("59m ago") plus a gap
+	rowsPerCard  = 3 // title line + meta line + blank separator
+)
 
 func truncateEllipsis(s string, max int) string {
 	r := []rune(s)
@@ -186,81 +183,179 @@ func padRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-w)
 }
 
-func (m model) viewList() string {
-	header := appTitleStyle.Render("ctxhub") + "  " +
-		subtitleStyle.Render(fmt.Sprintf("%d sessions found", len(m.sessions)))
+// frame draws a full lazygit-style panel: a title (and optional right-hand
+// label) embedded in the top border, a body, and an optional footer split
+// off by a divider. It always renders exactly width x height.
+func frame(width, height int, title, rightLabel string, body, footer []string) string {
+	if width < 24 {
+		width = 24
+	}
+	if height < 6 {
+		height = 6
+	}
+	contentWidth := width - 4 // "│ " + content + " │"
 
-	var rows []string
-	for i, s := range m.sessions {
-		icon := lipgloss.NewStyle().Foreground(providerColor(s.Provider.Name())).Render(s.Provider.Icon())
+	var out []string
+	out = append(out, topBorder(width, title, rightLabel))
 
-		dateStr := ""
-		if !s.CreatedAt.IsZero() {
-			dateStr = s.CreatedAt.Format("Jan 2")
+	footerBlock := 0
+	if len(footer) > 0 {
+		footerBlock = len(footer) + 1 // +1 for the divider
+	}
+	bodyHeight := height - 2 - footerBlock
+	if bodyHeight < 1 {
+		bodyHeight = 1
+	}
+
+	for i := 0; i < bodyHeight; i++ {
+		content := ""
+		if i < len(body) {
+			content = body[i]
 		}
-		dateCell := padRight(dateStyle.Render(dateStr), dateColWidth)
+		out = append(out, contentLine(content, contentWidth))
+	}
 
+	if len(footer) > 0 {
+		out = append(out, borderStyle.Render("├"+strings.Repeat("─", width-2)+"┤"))
+		for _, f := range footer {
+			out = append(out, contentLine(f, contentWidth))
+		}
+	}
+
+	out = append(out, borderStyle.Render("╰"+strings.Repeat("─", width-2)+"╯"))
+	return strings.Join(out, "\n")
+}
+
+func topBorder(width int, title, rightLabel string) string {
+	titleStyled := appTitleStyle.Render(" " + title + " ")
+	rightStyled := ""
+	rightW := 0
+	if rightLabel != "" {
+		rightStyled = subtitleStyle.Render(" " + rightLabel + " ")
+		rightW = lipgloss.Width(rightStyled)
+	}
+	fillLen := width - 4 - lipgloss.Width(titleStyled) - rightW
+	if fillLen < 0 {
+		fillLen = 0
+	}
+	return borderStyle.Render("╭─") + titleStyled + borderStyle.Render(strings.Repeat("─", fillLen)) + rightStyled + borderStyle.Render("─╮")
+}
+
+func contentLine(content string, contentWidth int) string {
+	return borderStyle.Render("│") + " " + padRight(content, contentWidth) + " " + borderStyle.Render("│")
+}
+
+func (m model) viewList() string {
+	width, height := m.width, m.height
+	if width < 40 {
+		width = 100
+	}
+	if height < 10 {
+		height = 32
+	}
+	contentWidth := width - 4
+	titleWidth := contentWidth - gutterWidth
+	metaWidth := contentWidth - gutterWidth
+
+	footer := []string{
+		helpKeyStyle.Render("↑/↓") + " " + helpDescStyle.Render("navigate") + "    " +
+			helpKeyStyle.Render("enter/o") + " " + helpDescStyle.Render("open") + "    " +
+			helpKeyStyle.Render("d") + " " + helpDescStyle.Render("delete") + "    " +
+			helpKeyStyle.Render("q") + " " + helpDescStyle.Render("quit"),
+	}
+
+	bodyHeight := height - 2 - (len(footer) + 1)
+	if bodyHeight < 1 {
+		bodyHeight = 1
+	}
+	visibleCards := bodyHeight / rowsPerCard
+	if visibleCards < 1 {
+		visibleCards = 1
+	}
+	scroll := 0
+	if m.cursor >= visibleCards {
+		scroll = m.cursor - visibleCards + 1
+	}
+
+	var body []string
+	end := scroll + visibleCards
+	if end > len(m.sessions) {
+		end = len(m.sessions)
+	}
+	for i := scroll; i < end; i++ {
+		s := m.sessions[i]
+		selected := i == m.cursor
+
+		icon := lipgloss.NewStyle().Foreground(providerColor(s.Provider.Name())).Render(s.Provider.Icon())
+		titleText := padRight(truncateEllipsis(s.Title, titleWidth), titleWidth)
+
+		metaLeftPlain := s.Provider.Name()
+		if !s.CreatedAt.IsZero() {
+			metaLeftPlain += " · " + s.CreatedAt.Format("Jan 2")
+		}
 		tag := ""
 		if isCurrent(s, m.currentID) {
-			tag = currentTagStyle.Render("  ● current")
+			tag = " · current"
 		}
-
-		contentWidth := listInnerWidth - iconColWidth - dateColWidth
-		titleMax := contentWidth - timeColWidth - lipgloss.Width(tag)
-		if titleMax < 4 {
-			titleMax = 4
-		}
-		title := truncateEllipsis(s.Title, titleMax) + tag
-
-		timeStr := relTime(s.UpdatedAt)
-		pad := contentWidth - lipgloss.Width(title) - lipgloss.Width(timeStr)
+		timeStr := padRight(relTime(s.UpdatedAt), timeColWidth)
+		pad := metaWidth - timeColWidth - lipgloss.Width(metaLeftPlain) - lipgloss.Width(tag)
 		if pad < 1 {
 			pad = 1
 		}
-		line := icon + " " + dateCell + title + strings.Repeat(" ", pad) + timeStyle.Render(timeStr)
 
 		cursor := "  "
-		if i == m.cursor {
+		var titleLine, metaLine string
+		if selected {
 			cursor = cursorStyle.Render("› ")
-			rows = append(rows, cursor+selectedItemStyle.Render(" "+line+" "))
+			titleLine = cursor + icon + " " + selectedItemStyle.Render(titleText)
+			metaLine = "   " + selectedItemStyle.Render(metaLeftPlain+tag+strings.Repeat(" ", pad)+timeStr)
 		} else {
-			rows = append(rows, cursor+itemStyle.Render(line))
+			titleLine = cursor + icon + " " + itemStyle.Render(titleText)
+			metaLine = "   " + metaStyle.Render(metaLeftPlain) + currentTagStyle.Render(tag) +
+				strings.Repeat(" ", pad) + timeStyle.Render(timeStr)
 		}
+
+		body = append(body, titleLine, metaLine, "")
 	}
-	list := strings.Join(rows, "\n")
-
-	help := helpKeyStyle.Render("↑/↓") + " " + helpDescStyle.Render("navigate") + "    " +
-		helpKeyStyle.Render("enter/o") + " " + helpDescStyle.Render("open") + "    " +
-		helpKeyStyle.Render("d") + " " + helpDescStyle.Render("delete") + "    " +
-		helpKeyStyle.Render("q") + " " + helpDescStyle.Render("quit")
-
-	body := lipgloss.JoinVertical(lipgloss.Left, header, "", list, "", help)
-	box := boxStyle.Render(body)
-
-	if m.width == 0 {
-		return box
+	for len(body) < bodyHeight {
+		body = append(body, "")
 	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+
+	rightLabel := fmt.Sprintf("%d sessions", len(m.sessions))
+	return frame(width, height, "ctxhub", rightLabel, body, footer)
 }
 
 func (m model) viewConfirm() string {
-	title := dialogTitleStyle.Render("Delete this session?")
-	name := itemStyle.Render("\"" + m.target.Title + "\"")
+	width, height := m.width, m.height
+	if width < 40 {
+		width = 100
+	}
+	if height < 10 {
+		height = 32
+	}
+
+	panelWidth := 56
+	panelHeight := 9
+	contentWidth := panelWidth - 4
+
+	name := itemStyle.Render(padRight(truncateEllipsis(m.target.Title, contentWidth), contentWidth))
 	provider := lipgloss.NewStyle().Foreground(providerColor(m.target.Provider.Name())).Render(
 		m.target.Provider.Icon() + " " + m.target.Provider.Name())
 
-	buttons := lipgloss.JoinHorizontal(lipgloss.Top,
-		buttonDangerStyle.Render("y Delete"),
-		buttonStyle.Render("n Cancel"),
-	)
-
-	body := lipgloss.JoinVertical(lipgloss.Left, title, "", name, provider, "", buttons)
-	box := boxStyle.Render(body)
-
-	if m.width == 0 {
-		return box
+	body := []string{
+		"",
+		name,
+		provider,
 	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	footer := []string{
+		lipgloss.JoinHorizontal(lipgloss.Top,
+			buttonDangerStyle.Render("y Delete"),
+			buttonStyle.Render("n Cancel"),
+		),
+	}
+
+	panel := frame(panelWidth, panelHeight, "Delete session?", "", body, footer)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel)
 }
 
 func relTime(t time.Time) string {

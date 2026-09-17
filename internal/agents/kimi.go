@@ -26,7 +26,7 @@ type kimiCode struct{}
 func NewKimiCode() Provider { return kimiCode{} }
 
 func (kimiCode) Name() string { return "Kimi Code" }
-func (kimiCode) Icon() string { return "✦" }
+func (kimiCode) Icon() string { return "☾" }
 
 func kimiHome() (string, error) {
 	home, err := os.UserHomeDir()

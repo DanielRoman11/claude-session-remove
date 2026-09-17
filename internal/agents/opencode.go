@@ -18,7 +18,7 @@ type openCode struct{}
 func NewOpenCode() Provider { return openCode{} }
 
 func (openCode) Name() string { return "OpenCode" }
-func (openCode) Icon() string { return "◆" }
+func (openCode) Icon() string { return "▦" }
 
 type openCodeSession struct {
 	ID        string `json:"id"`

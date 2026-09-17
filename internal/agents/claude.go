@@ -21,7 +21,7 @@ type claudeCode struct{}
 func NewClaudeCode() Provider { return claudeCode{} }
 
 func (claudeCode) Name() string { return "Claude Code" }
-func (claudeCode) Icon() string { return "✳" }
+func (claudeCode) Icon() string { return "✻" }
 
 type claudeEntry struct {
 	Type      string `json:"type"`
