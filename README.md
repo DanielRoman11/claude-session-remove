@@ -25,13 +25,36 @@ Two ways to use it:
 
 ## Install
 
-### The binary
+### Option A: curl (recommended, no Go required)
+
+Downloads a prebuilt binary for your OS/architecture, verifies its checksum, and installs it — nothing to compile.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DanielRoman11/claude-session-remove/main/install.sh | bash
+```
+
+Step by step, this does:
+
+1. Detects your OS and architecture (linux/darwin, amd64/arm64).
+2. Downloads the matching `csr` binary from the [latest release](https://github.com/DanielRoman11/claude-session-remove/releases/latest).
+3. Downloads `checksums.txt` from that same release and verifies the download's `sha256` before touching anything else.
+4. Extracts and installs the binary to `~/.local/bin/csr` (override with `CSR_INSTALL_DIR=/some/dir`).
+5. If `~/.claude/commands/` already exists, it also drops `csr.md` there so `/csr` works right away (set `CSR_INSTALL_COMMAND=1` to force this even without a `~/.claude` directory, or skip it and see "The `/csr` command" below).
+6. Prints a `PATH` reminder if `~/.local/bin` isn't on it yet.
+
+Prefer to read the script before running it? It's right here: [`install.sh`](install.sh).
+
+To install a specific version instead of latest: `CSR_VERSION=v1.0.0 curl -fsSL .../install.sh | bash`.
+
+### Option B: Go toolchain
 
 ```bash
 go install github.com/DanielRoman11/claude-session-remove/cmd/csr@latest
 ```
 
-or build from a local clone:
+Make sure `$(go env GOPATH)/bin` is on your `PATH`.
+
+### Option C: build from source
 
 ```bash
 git clone https://github.com/DanielRoman11/claude-session-remove
@@ -39,38 +62,58 @@ cd claude-session-remove
 go build -o ~/.local/bin/csr ./cmd/csr
 ```
 
-Make sure `~/.local/bin` (or wherever `go install` puts binaries — usually `$(go env GOPATH)/bin`) is on your `PATH`.
-
 ### The `/csr` command (optional)
 
-Copy `commands/csr.md` into `~/.claude/commands/`, or install this as a Claude Code plugin (`.claude-plugin/plugin.json` is already set up for that).
+The curl installer above already does this for you when `~/.claude/commands/` exists. To do it by hand instead, copy `commands/csr.md` into `~/.claude/commands/`:
+
+```bash
+mkdir -p ~/.claude/commands
+curl -fsSL https://raw.githubusercontent.com/DanielRoman11/claude-session-remove/main/commands/csr.md \
+  -o ~/.claude/commands/csr.md
+```
+
+or install this as a Claude Code plugin (`.claude-plugin/plugin.json` is already set up for that).
 
 ## Usage: standalone (terminal)
 
-### `csr`
+1. `cd` into any project directory you've used with Claude Code.
+2. Run:
+   ```bash
+   csr
+   ```
+3. A full-screen picker opens listing that project's sessions, most recent first, with the current one tagged `● current`.
+4. Move the selection with `↑`/`↓` (or `j`/`k`).
+5. Press `enter` or `d` on a session to open the delete confirmation.
+6. Press `y` to delete, or `n`/`esc` to cancel and go back to the list.
+7. On confirmed delete:
+   - if it wasn't the active session, `csr` hands off straight into `claude --resume` (via `exec`) so you land on the picker for your remaining sessions;
+   - if it *was* the active session, it prints a warning instead and does not resume (see "How it works").
+8. Press `q` at any time to quit without deleting anything.
 
-Opens the picker: every session for the current project directory, most recent first, current one tagged. Arrow keys (or `j`/`k`) move, `enter`/`d` opens a confirm dialog, `y` deletes, `n`/`esc` cancels, `q` quits.
+You can also jump straight to a session instead of browsing the full list:
 
-### `csr <name>`
+```bash
+csr db-migration
+```
 
-Filters first by title or session id substring:
+- **One match** for the title/id substring: goes straight to the confirm dialog (step 5 above).
+- **Multiple matches**: opens the picker, scoped to just those matches.
+- **No match**: prints `No session found matching "db-migration"` and exits.
 
-- **One match:** goes straight to the confirm dialog.
-- **Multiple matches:** opens the picker, scoped to the matches.
-- **No match:** prints `No session found matching "<name>"` and exits.
-
-After a confirmed deletion, it hands off straight into `claude --resume` (via `exec`, replacing the process) so you land on the picker for your remaining sessions, and you never see the transcript you just deleted since its file is already gone.
-
-If stdin/stdout isn't a real terminal (piped, redirected, scripted), `csr` falls back to a plain numbered prompt instead of the TUI.
+If stdin/stdout isn't a real terminal (piped, redirected, scripted), `csr` falls back to a plain numbered prompt instead of the TUI — no extra setup needed.
 
 ## Usage: `/csr` inside Claude Code
 
-```
-> /csr
-> /csr db-migration
-```
-
-Behind the scenes this runs `csr --list` to read the sessions (no prompts), resolves your target, asks you to pick/confirm through Claude Code's own question UI (a real TUI can't be driven from inside a tool call — there's no attached tty), then runs `csr --id <id> --yes --no-resume` to actually delete. It does not chain into `claude --resume` itself; use Claude Code's own `/resume` afterward if you want to switch sessions.
+1. Inside a Claude Code session, type:
+   ```
+   /csr
+   ```
+   to target the current session, or `/csr <name>` to match a different one by title/id.
+2. Claude runs `csr --list` behind the scenes (no prompts) and resolves your target.
+3. If there's more than one match, Claude asks you to pick one via its own question UI.
+4. Claude asks you to confirm the deletion (yes/no) the same way.
+5. On yes, it runs `csr --id <id> --yes --no-resume` and reports the result in one line.
+6. It does **not** chain into `claude --resume` itself (there's no tty inside a tool call to drive that hand-off) — run Claude Code's own `/resume` afterward if you want to switch sessions.
 
 ## Non-interactive flags
 
@@ -101,4 +144,4 @@ Daniel Roman
 
 ## Version
 
-2.0.0
+1.0.0
