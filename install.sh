@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Installs the ctxhub binary from a prebuilt GitHub release, verifies its
-# checksum, and optionally installs the /ctxhub command for Claude Code.
+# Installs the context-hub binary from a prebuilt GitHub release, verifies its
+# checksum, and optionally installs the /context-hub command for Claude Code.
 #
-#   curl -fsSL https://raw.githubusercontent.com/DanielRoman11/ctxhub/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/DanielRoman11/context-hub/main/install.sh | bash
 set -euo pipefail
 
-REPO="DanielRoman11/ctxhub"
-BIN_NAME="ctxhub"
-INSTALL_DIR="${CTXHUB_INSTALL_DIR:-$HOME/.local/bin}"
-VERSION="${CTXHUB_VERSION:-latest}"
+REPO="DanielRoman11/context-hub"
+BIN_NAME="context-hub"
+INSTALL_DIR="${CONTEXT_HUB_INSTALL_DIR:-$HOME/.local/bin}"
+VERSION="${CONTEXT_HUB_VERSION:-latest}"
 
 log() { printf '%s\n' "$*" >&2; }
 die() { log "error: $*"; exit 1; }
@@ -74,13 +74,13 @@ case ":${PATH}:" in
      log "  export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
 esac
 
-if [ -d "$HOME/.claude/commands" ] || [ "${CTXHUB_INSTALL_COMMAND:-}" = "1" ]; then
+if [ -d "$HOME/.claude/commands" ] || [ "${CONTEXT_HUB_INSTALL_COMMAND:-}" = "1" ]; then
   mkdir -p "$HOME/.claude/commands"
-  cmd_url="https://raw.githubusercontent.com/$REPO/main/commands/ctxhub.md"
-  if curl -fsSL "$cmd_url" -o "$HOME/.claude/commands/ctxhub.md"; then
-    log "Installed the /ctxhub command to $HOME/.claude/commands/ctxhub.md"
+  cmd_url="https://raw.githubusercontent.com/$REPO/main/commands/context-hub.md"
+  if curl -fsSL "$cmd_url" -o "$HOME/.claude/commands/context-hub.md"; then
+    log "Installed the /context-hub command to $HOME/.claude/commands/context-hub.md"
   else
-    log "Note: could not fetch the /ctxhub command file; skipping (the binary still works standalone)"
+    log "Note: could not fetch the /context-hub command file; skipping (the binary still works standalone)"
   fi
 fi
 

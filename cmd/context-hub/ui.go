@@ -2,32 +2,37 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/DanielRoman11/ctxhub/internal/agents"
+	"github.com/DanielRoman11/context-hub/internal/agents"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Claude Code's own palette: a warm terracotta accent over neutral stone
-// grays, adapted for both light and dark terminals. Each other provider
-// gets its own accent so its sessions are recognizable at a glance.
+// Catppuccin (Mocha for dark terminals, Latte for light ones) — the palette
+// most TUI tools like lazygit reach for today. Each provider gets its own
+// accent so its sessions are recognizable at a glance.
 //
-// Icons are the closest single-glyph approximation of each tool's real
-// mark, not arbitrary shapes: Claude's is a spoked sunburst/asterisk,
-// OpenCode's is a modular pixel-block grid, Kimi Code's leans on Moonshot
-// AI's own moon branding (their Chinese name literally means "the dark
-// side of the moon").
+// Icons: Claude Code uses the real Codicons glyph Nerd Fonts ships for it
+// (U+EC82) — set CONTEXT_HUB_PLAIN_ICONS=1 to fall back to a plain Unicode
+// glyph if your terminal font isn't Nerd Font-patched. OpenCode and Kimi
+// Code have no official glyph in any font, Nerd or otherwise, so theirs are
+// the closest Unicode approximation of their real marks: OpenCode's is a
+// modular pixel-block grid, Kimi Code's leans on Moonshot AI's own moon
+// branding (their Chinese name literally means "the dark side of the
+// moon").
 var (
-	colorAccent   = lipgloss.AdaptiveColor{Light: "#C2410C", Dark: "#DA7756"}
-	colorOpenCode = lipgloss.AdaptiveColor{Light: "#0E7490", Dark: "#22D3EE"}
-	colorKimi     = lipgloss.AdaptiveColor{Light: "#475569", Dark: "#94A3B8"}
-	colorText     = lipgloss.AdaptiveColor{Light: "#292524", Dark: "#E7E5E4"}
-	colorMuted    = lipgloss.AdaptiveColor{Light: "#78716C", Dark: "#A8A29E"}
-	colorFaint    = lipgloss.AdaptiveColor{Light: "#D6D3D1", Dark: "#57534E"}
-	colorDanger   = lipgloss.AdaptiveColor{Light: "#B91C1C", Dark: "#E5484D"}
-	colorOnAcc    = lipgloss.AdaptiveColor{Light: "#FFFBEB", Dark: "#1C1917"}
+	colorAccent   = lipgloss.AdaptiveColor{Light: "#8839ef", Dark: "#cba6f7"} // mauve
+	colorOpenCode = lipgloss.AdaptiveColor{Light: "#1e66f5", Dark: "#89b4fa"} // blue
+	colorKimi     = lipgloss.AdaptiveColor{Light: "#179299", Dark: "#94e2d5"} // teal
+	colorText     = lipgloss.AdaptiveColor{Light: "#4c4f69", Dark: "#cdd6f4"} // text
+	colorMuted    = lipgloss.AdaptiveColor{Light: "#6c6f85", Dark: "#a6adc8"} // subtext0
+	colorFaint    = lipgloss.AdaptiveColor{Light: "#9ca0b0", Dark: "#6c7086"} // overlay0
+	colorDanger   = lipgloss.AdaptiveColor{Light: "#d20f39", Dark: "#f38ba8"} // red
+	colorSuccess  = lipgloss.AdaptiveColor{Light: "#40a02b", Dark: "#a6e3a1"} // green
+	colorOnAcc    = lipgloss.AdaptiveColor{Light: "#eff1f5", Dark: "#1e1e2e"} // base
 
 	borderStyle   = lipgloss.NewStyle().Foreground(colorAccent)
 	appTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(colorAccent)
@@ -42,7 +47,7 @@ var (
 				Foreground(colorOnAcc).
 				Background(colorAccent)
 
-	currentTagStyle = lipgloss.NewStyle().Foreground(colorAccent).Italic(true)
+	currentTagStyle = lipgloss.NewStyle().Foreground(colorSuccess).Italic(true)
 	metaStyle       = lipgloss.NewStyle().Foreground(colorMuted)
 	timeStyle       = lipgloss.NewStyle().Foreground(colorFaint)
 	dimStyle        = lipgloss.NewStyle().Foreground(colorMuted)
@@ -55,7 +60,7 @@ var (
 	buttonDangerStyle = lipgloss.NewStyle().Padding(0, 2).MarginRight(2).Bold(true).
 				Foreground(colorOnAcc).Background(colorDanger)
 
-	successStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#15803D", Dark: "#4ADE80"})
+	successStyle = lipgloss.NewStyle().Bold(true).Foreground(colorSuccess)
 )
 
 // providerColor picks each provider's accent by name, so the agents package
@@ -69,6 +74,22 @@ func providerColor(name string) lipgloss.AdaptiveColor {
 	default:
 		return colorAccent
 	}
+}
+
+// claudeNerdFontIcon is the real Claude mark from Codicons (bundled by Nerd
+// Fonts) — it only renders correctly if the terminal's font is Nerd
+// Font-patched. CONTEXT_HUB_PLAIN_ICONS=1 opts back into a plain glyph.
+const claudeNerdFontIcon = ""
+
+var plainIcons = os.Getenv("CONTEXT_HUB_PLAIN_ICONS") != ""
+
+// displayIcon returns the glyph to render for a provider, preferring a real
+// brand icon over the generic Provider.Icon() fallback where one exists.
+func displayIcon(p agents.Provider) string {
+	if p.Name() == "Claude Code" && !plainIcons {
+		return claudeNerdFontIcon
+	}
+	return p.Icon()
 }
 
 type screen int
@@ -286,7 +307,7 @@ func (m model) viewList() string {
 		s := m.sessions[i]
 		selected := i == m.cursor
 
-		icon := lipgloss.NewStyle().Foreground(providerColor(s.Provider.Name())).Render(s.Provider.Icon())
+		icon := lipgloss.NewStyle().Foreground(providerColor(s.Provider.Name())).Render(displayIcon(s.Provider))
 		titleText := padRight(truncateEllipsis(s.Title, titleWidth), titleWidth)
 
 		metaLeftPlain := s.Provider.Name()
@@ -322,7 +343,7 @@ func (m model) viewList() string {
 	}
 
 	rightLabel := fmt.Sprintf("%d sessions", len(m.sessions))
-	return frame(width, height, "ctxhub", rightLabel, body, footer)
+	return frame(width, height, "context-hub", rightLabel, body, footer)
 }
 
 func (m model) viewConfirm() string {
@@ -340,7 +361,7 @@ func (m model) viewConfirm() string {
 
 	name := itemStyle.Render(padRight(truncateEllipsis(m.target.Title, contentWidth), contentWidth))
 	provider := lipgloss.NewStyle().Foreground(providerColor(m.target.Provider.Name())).Render(
-		m.target.Provider.Icon() + " " + m.target.Provider.Name())
+		displayIcon(m.target.Provider) + " " + m.target.Provider.Name())
 
 	body := []string{
 		"",

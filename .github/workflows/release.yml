@@ -36,13 +36,13 @@ jobs:
           CGO_ENABLED: 0
         run: |
           mkdir -p dist
-          go build -trimpath -ldflags "-s -w" -o dist/ctxhub ./cmd/ctxhub
-          tar -C dist -czf ctxhub_${{ matrix.os }}_${{ matrix.arch }}.tar.gz ctxhub
+          go build -trimpath -ldflags "-s -w" -o dist/context-hub ./cmd/context-hub
+          tar -C dist -czf context-hub_${{ matrix.os }}_${{ matrix.arch }}.tar.gz context-hub
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ctxhub_${{ matrix.os }}_${{ matrix.arch }}
-          path: ctxhub_${{ matrix.os }}_${{ matrix.arch }}.tar.gz
+          name: context-hub_${{ matrix.os }}_${{ matrix.arch }}
+          path: context-hub_${{ matrix.os }}_${{ matrix.arch }}.tar.gz
 
   release:
     needs: build

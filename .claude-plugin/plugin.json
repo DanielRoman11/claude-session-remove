@@ -1,6 +1,6 @@
 {
-  "name": "ctxhub",
-  "description": "Browse, delete, and resume AI coding CLI sessions (Claude Code, OpenCode, Kimi Code) via the ctxhub TUI or the /ctxhub command",
+  "name": "context-hub",
+  "description": "Browse, delete, and resume AI coding CLI sessions (Claude Code, OpenCode, Kimi Code) via the context-hub TUI or the /context-hub command",
   "version": "2.1.0",
   "author": {
     "name": "Daniel Roman",

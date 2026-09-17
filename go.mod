@@ -1,4 +1,4 @@
-module github.com/DanielRoman11/ctxhub
+module github.com/DanielRoman11/context-hub
 
 go 1.25.0
 

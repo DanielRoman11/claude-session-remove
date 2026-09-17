@@ -1,4 +1,4 @@
-// Command ctxhub lists, deletes, and resumes AI coding CLI sessions
+// Command context-hub lists, deletes, and resumes AI coding CLI sessions
 // (Claude Code, OpenCode, Kimi Code) for the current project directory.
 //
 // It runs entirely outside those tools: no API calls, no tokens spent.
@@ -11,12 +11,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/DanielRoman11/ctxhub/internal/agents"
+	"github.com/DanielRoman11/context-hub/internal/agents"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-isatty"
 )
 
-// flags for the non-interactive mode used by the /ctxhub command running
+// flags for the non-interactive mode used by the /context-hub command running
 // inside Claude Code, where there is no real tty to drive a TUI on.
 type flags struct {
 	list     bool
@@ -67,7 +67,7 @@ func main() {
 	currentID := os.Getenv("CLAUDE_CODE_SESSION_ID")
 
 	// --list: machine-readable dump, no prompts, no TUI. Used by the
-	// /ctxhub command to resolve a target without driving a program
+	// /context-hub command to resolve a target without driving a program
 	// Claude Code can't attach a tty to.
 	if f.list {
 		for _, s := range sessions {
@@ -82,7 +82,7 @@ func main() {
 	}
 
 	// --id: delete a specific, already-resolved session non-interactively.
-	// Used by the /ctxhub command after it has picked a target and
+	// Used by the /context-hub command after it has picked a target and
 	// confirmed with the user itself (via AskUserQuestion).
 	if f.id != "" {
 		target, ok := findByComposite(sessions, f.id)

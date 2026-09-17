@@ -1,4 +1,4 @@
-// Package agents defines the provider interface ctxhub uses to list,
+// Package agents defines the provider interface context-hub uses to list,
 // delete, and resume sessions across different AI coding CLIs.
 package agents
 
@@ -36,7 +36,7 @@ type Provider interface {
 	Relaunch(dir string) error
 }
 
-// All returns every provider ctxhub knows about.
+// All returns every provider context-hub knows about.
 func All() []Provider {
 	return []Provider{
 		NewClaudeCode(),
