@@ -74,8 +74,7 @@ if [ "${#match_ids[@]}" -gt 1 ] || [ -z "$query" ]; then
     fi
     printf "  %d. %s [%s]%s\n" "$((i+1))" "${match_titles[$i]}" "${match_ids[$i]}" "$mark"
   done
-  read -rp "Select a session to delete (1-${#match_ids[@]}, or Enter to cancel): " choice
-  if [ -z "$choice" ]; then
+  if ! read -rp "Select a session to delete (1-${#match_ids[@]}, or Enter to cancel): " choice || [ -z "$choice" ]; then
     echo "Cancelled."
     exit 0
   fi
@@ -92,8 +91,7 @@ sid="${match_ids[$idx]}"
 title="${match_titles[$idx]}"
 file="$PROJECT_DIR/$sid.jsonl"
 
-read -rp "Delete session \"$title\" ($file)? (y/N) " confirm
-if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+if ! read -rp "Delete session \"$title\" ($file)? (y/N) " confirm || [[ ! "$confirm" =~ ^[Yy]$ ]]; then
   echo "Cancelled."
   exit 0
 fi
@@ -101,6 +99,9 @@ fi
 rm -- "$file"
 echo "Session deleted."
 
-if [ "$sid" = "${CLAUDE_CODE_SESSION_ID:-}" ]; then
-  echo "This was the active session. Exit it (/exit or Ctrl-D) and start a new 'claude' to fully leave it."
+if ! command -v claude >/dev/null 2>&1; then
+  echo "'claude' not found on PATH, skipping resume."
+  exit 0
 fi
+
+exec claude --resume
