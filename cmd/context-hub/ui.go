@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -15,14 +14,12 @@ import (
 // most TUI tools like lazygit reach for today. Each provider gets its own
 // accent so its sessions are recognizable at a glance.
 //
-// Icons: Claude Code uses the real Codicons glyph Nerd Fonts ships for it
-// (U+EC82) — set CONTEXT_HUB_PLAIN_ICONS=1 to fall back to a plain Unicode
-// glyph if your terminal font isn't Nerd Font-patched. OpenCode and Kimi
-// Code have no official glyph in any font, Nerd or otherwise, so theirs are
-// the closest Unicode approximation of their real marks: OpenCode's is a
-// modular pixel-block grid, Kimi Code's leans on Moonshot AI's own moon
-// branding (their Chinese name literally means "the dark side of the
-// moon").
+// Icons: none of these three tools has an icon in any released font
+// (Nerd Font or otherwise) — see displayIcon below for Claude Code's case
+// specifically — so all three use the closest Unicode approximation of
+// their real mark: a sunburst/asterisk for Claude Code, a modular
+// pixel-block grid for OpenCode, and a crescent moon for Kimi Code
+// (Moonshot AI's name literally means "the dark side of the moon").
 var (
 	colorAccent   = lipgloss.AdaptiveColor{Light: "#8839ef", Dark: "#cba6f7"} // mauve
 	colorOpenCode = lipgloss.AdaptiveColor{Light: "#1e66f5", Dark: "#89b4fa"} // blue
@@ -76,19 +73,14 @@ func providerColor(name string) lipgloss.AdaptiveColor {
 	}
 }
 
-// claudeNerdFontIcon is the real Claude mark from Codicons (bundled by Nerd
-// Fonts) — it only renders correctly if the terminal's font is Nerd
-// Font-patched. CONTEXT_HUB_PLAIN_ICONS=1 opts back into a plain glyph.
-const claudeNerdFontIcon = ""
-
-var plainIcons = os.Getenv("CONTEXT_HUB_PLAIN_ICONS") != ""
-
-// displayIcon returns the glyph to render for a provider, preferring a real
-// brand icon over the generic Provider.Icon() fallback where one exists.
+// displayIcon returns the glyph to render for a provider. Codicons does
+// define a real Claude mark (U+EC82), but it's new enough that no released
+// Nerd Font build actually ships it yet (checked against an installed
+// Maple Mono NF build: its Codicons range ends at U+EC1E, before U+EC82),
+// so it would render as a blank box for effectively everyone. Until a
+// released Nerd Font build includes it, all three providers use a plain
+// Unicode glyph instead.
 func displayIcon(p agents.Provider) string {
-	if p.Name() == "Claude Code" && !plainIcons {
-		return claudeNerdFontIcon
-	}
 	return p.Icon()
 }
 

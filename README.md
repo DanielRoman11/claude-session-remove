@@ -33,7 +33,7 @@ Two ways to use it:
 
 | Provider | Icon | List/delete via | Notes |
 |---|---|---|---|
-| Claude Code | the real mark (Codicons' `cod-claude`, U+EC82) | reads `~/.claude/projects/<cwd>/*.jsonl` directly | needs a [Nerd Font](https://www.nerdfonts.com/) in your terminal to render; set `CONTEXT_HUB_PLAIN_ICONS=1` to fall back to a plain "✻" if yours isn't patched |
+| Claude Code | ✻ | reads `~/.claude/projects/<cwd>/*.jsonl` directly | Codicons does define a real Claude mark (`cod-claude`, U+EC82), but it's new enough that no released Nerd Font build ships it yet (checked against a real install), so it'd render as a blank box for effectively everyone — this uses a plain Unicode sunburst instead |
 | OpenCode | ▦ | shells out to `opencode session list/delete` | no official glyph exists anywhere for OpenCode, so this is the closest Unicode approximation of its modular pixel-block mark; uses OpenCode's own CLI, never touches its sqlite db directly |
 | Kimi Code | ☾ | reads `~/.kimi-code/session_index.jsonl` + `state.json` | no official glyph exists for Kimi Code either, so this leans on Moonshot AI's own moon branding (their Chinese name literally means "the dark side of the moon"). Also best-effort: written from Kimi Code's docs, not verified against a live install. If your sessions don't show up, please open an issue with what `~/.kimi-code/session_index.jsonl` looks like |
 
