@@ -130,7 +130,7 @@ func main() {
 				return
 			}
 		}
-		deleteAndMaybeResume(*target, f.noResume)
+		deleteAndMaybeResume(*target, currentID, f.noResume)
 		return
 	}
 
@@ -159,14 +159,30 @@ func main() {
 		return
 	}
 
-	deleteAndMaybeResume(chosen, f.noResume)
+	deleteAndMaybeResume(chosen, currentID, f.noResume)
 }
 
-func deleteAndMaybeResume(target session, noResume bool) {
+// deleteAndMaybeResume removes target's transcript and, only when it was
+// NOT the currently active session, hands off to `claude --resume`.
+//
+// Chaining into --resume after deleting the *active* session is unsafe:
+// `claude --resume` with no explicit id can fall back to the most recently
+// active session, which is exactly the one just deleted, and Claude Code
+// will happily recreate a blank transcript under that same id. So instead
+// of undoing the deletion, we just tell the user to exit and start a fresh
+// (non-resumed) `claude` themselves.
+func deleteAndMaybeResume(target session, currentID string, noResume bool) {
+	wasCurrent := currentID != "" && target.ID == currentID
+
 	if err := os.Remove(target.Path); err != nil {
 		fatal("could not delete session: %v", err)
 	}
 	fmt.Println("Session deleted.")
+
+	if wasCurrent {
+		fmt.Println("This was the active session. Exit this terminal (Ctrl-D) and start a plain 'claude' (not --resume) elsewhere — resuming right now could recreate it under the same id.")
+		return
+	}
 
 	if noResume {
 		return
