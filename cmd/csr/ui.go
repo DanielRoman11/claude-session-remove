@@ -127,18 +127,51 @@ func (m model) View() string {
 	}
 }
 
+// listInnerWidth is the fixed width of a row's text (title + time), so the
+// time column lands flush right and stays put as the cursor moves between
+// rows of different title lengths.
+const listInnerWidth = 54
+
+// timeColWidth reserves room for the widest relTime() output ("59m ago",
+// "23h ago", "29d ago") plus a one-space gap before it.
+const timeColWidth = 8
+
+func truncateEllipsis(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	if max <= 1 {
+		return "…"
+	}
+	return string(r[:max-1]) + "…"
+}
+
 func (m model) viewList() string {
 	header := appTitleStyle.Render("Claude Code Sessions") + "  " +
 		subtitleStyle.Render(fmt.Sprintf("%d found", len(m.sessions)))
 
 	var rows []string
 	for i, s := range m.sessions {
-		cursor := "  "
-		line := fmt.Sprintf("%s   %s", s.Title, relTime(s.ModTime))
+		tag := ""
 		if m.currentID != "" && s.ID == m.currentID {
-			line = fmt.Sprintf("%s  %s   %s", s.Title, currentTagStyle.Render("● current"), relTime(s.ModTime))
+			tag = currentTagStyle.Render("  ● current")
 		}
 
+		titleMax := listInnerWidth - timeColWidth - lipgloss.Width(tag)
+		if titleMax < 4 {
+			titleMax = 4
+		}
+		left := truncateEllipsis(s.Title, titleMax) + tag
+
+		timeStr := relTime(s.ModTime)
+		pad := listInnerWidth - lipgloss.Width(left) - lipgloss.Width(timeStr)
+		if pad < 1 {
+			pad = 1
+		}
+		line := left + strings.Repeat(" ", pad) + timeStyle.Render(timeStr)
+
+		cursor := "  "
 		if i == m.cursor {
 			cursor = cursorStyle.Render("› ")
 			rows = append(rows, cursor+selectedItemStyle.Render(" "+line+" "))
