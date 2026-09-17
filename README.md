@@ -1,72 +1,82 @@
-# Session Cleanup Plugin
+# claude-session-remove
 
-Delete Claude Code session transcripts, either from a plain terminal (zero tokens) or with a `/delete-session` command inside Claude Code (minimal, deterministic).
+Delete Claude Code session transcripts, either from a plain terminal (zero tokens, full TUI) or with a `/csr` command inside Claude Code (minimal, deterministic).
 
 ## Overview
 
-Sessions can only be created, resumed, and cleared today — there's no way to permanently remove one. This plugin ships `claude-delete-session`, a small Go binary that finds and deletes a session's transcript file for you, with confirmation, so leftover test sessions (or ones containing sensitive data) don't have to be cleaned up by hand in `~/.claude/projects/`.
+Sessions can only be created, resumed, and cleared today — there's no way to permanently remove one. This project ships `csr`, a small Go binary that finds and deletes a session's transcript file for you, with confirmation, so leftover test sessions (or ones containing sensitive data) don't have to be cleaned up by hand in `~/.claude/projects/`.
 
 Two ways to use it:
 
-- **Standalone, in any terminal:** run the binary directly. No Claude process involved, no tokens spent, full interactive picker.
-- **`/delete-session` inside Claude Code:** the command runs the same binary in a non-interactive mode and only asks you two things (which session, and to confirm) through Claude Code's own UI — it does not reason about parsing sessions itself, that logic lives entirely in the binary.
+- **Standalone, in any terminal:** run `csr`. No Claude process involved, no tokens spent, a full-screen picker built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lipgloss](https://github.com/charmbracelet/lipgloss), styled after Claude Code's own palette.
+- **`/csr` inside Claude Code:** the command runs the same binary in a non-interactive mode and only asks you two things (which session, and to confirm) through Claude Code's own UI — it does not reason about parsing sessions itself, that logic lives entirely in the binary.
+
+```
+╭──────────────────────────────────────────────╮
+│ Claude Code Sessions  3 found                 │
+│                                                │
+│ ›  Fix auth flow                    2h ago    │
+│    Old experiment    ● current      1d ago    │
+│    Db migration test                3d ago    │
+│                                                │
+│ ↑/↓ navigate    enter/d delete    q quit       │
+╰──────────────────────────────────────────────╯
+```
 
 ## Install
 
+### The binary
+
 ```bash
-cd plugins/session-cleanup
-go build -o ~/.local/bin/claude-delete-session .
+go install github.com/DanielRoman11/claude-session-remove/cmd/csr@latest
 ```
 
-Make sure `~/.local/bin` (or wherever you put the binary) is on your `PATH`. For the `/delete-session` command, also copy `commands/delete-session.md` into `~/.claude/commands/` (or install the plugin through Claude Code's plugin system).
+or build from a local clone:
+
+```bash
+git clone https://github.com/DanielRoman11/claude-session-remove
+cd claude-session-remove
+go build -o ~/.local/bin/csr ./cmd/csr
+```
+
+Make sure `~/.local/bin` (or wherever `go install` puts binaries — usually `$(go env GOPATH)/bin`) is on your `PATH`.
+
+### The `/csr` command (optional)
+
+Copy `commands/csr.md` into `~/.claude/commands/`, or install this as a Claude Code plugin (`.claude-plugin/plugin.json` is already set up for that).
 
 ## Usage: standalone (terminal)
 
-### `claude-delete-session`
+### `csr`
 
-Lists every session for the current project directory, most recent first, like `claude --resume` does, and marks the current one (if `CLAUDE_CODE_SESSION_ID` is set) so you can pick which to delete:
+Opens the picker: every session for the current project directory, most recent first, current one tagged. Arrow keys (or `j`/`k`) move, `enter`/`d` opens a confirm dialog, `y` deletes, `n`/`esc` cancels, `q` quits.
 
-```
-$ claude-delete-session
-Sessions for this project:
-  1. Fix auth flow [f3a1...b2]
-  2. Old experiment [9c02...ee] (current)
-  3. Db migration test [11ab...44]
-Select a session to delete (1-3, or Enter to cancel): 3
-Delete session "Db migration test" (~/.claude/projects/.../11ab....jsonl)? (y/N) y
-Session deleted.
-```
+### `csr <name>`
 
-### `claude-delete-session <name>`
+Filters first by title or session id substring:
 
-Filters first by title or session id substring before confirming:
-
-```
-$ claude-delete-session db-migration
-Delete session "Db migration test" (~/.claude/projects/.../11ab....jsonl)? (y/N) y
-Session deleted.
-```
-
-- **One match:** confirms and deletes that session.
-- **Multiple matches:** shows the same numbered picker, scoped to the matches.
+- **One match:** goes straight to the confirm dialog.
+- **Multiple matches:** opens the picker, scoped to the matches.
 - **No match:** prints `No session found matching "<name>"` and exits.
 
 After a confirmed deletion, it hands off straight into `claude --resume` (via `exec`, replacing the process) so you land on the picker for your remaining sessions, and you never see the transcript you just deleted since its file is already gone.
 
-## Usage: `/delete-session` inside Claude Code
+If stdin/stdout isn't a real terminal (piped, redirected, scripted), `csr` falls back to a plain numbered prompt instead of the TUI.
+
+## Usage: `/csr` inside Claude Code
 
 ```
-> /delete-session
-> /delete-session db-migration
+> /csr
+> /csr db-migration
 ```
 
-Behind the scenes this runs `claude-delete-session --list` to read the sessions (no prompts), resolves your target, asks you to pick/confirm through Claude Code's own question UI (a real shell `y/n` prompt can't be answered from inside a tool call — there's no attached tty), then runs `claude-delete-session --id <id> --yes --no-resume` to actually delete. It does not chain into `claude --resume` itself; use Claude Code's own `/resume` afterward if you want to switch sessions.
+Behind the scenes this runs `csr --list` to read the sessions (no prompts), resolves your target, asks you to pick/confirm through Claude Code's own question UI (a real TUI can't be driven from inside a tool call — there's no attached tty), then runs `csr --id <id> --yes --no-resume` to actually delete. It does not chain into `claude --resume` itself; use Claude Code's own `/resume` afterward if you want to switch sessions.
 
 ## Non-interactive flags
 
-For scripting or the `/delete-session` command:
+For scripting or the `/csr` command:
 
-- `--list` — print `id<TAB>title<TAB>is_current<TAB>mtime` for every session, no prompts.
+- `--list` — print `id<TAB>title<TAB>is_current<TAB>mtime` for every session, no prompts, no TUI.
 - `--id <id> --yes [--no-resume]` — delete that exact session id without any prompt.
 
 ## How it works
@@ -91,4 +101,4 @@ Daniel Roman
 
 ## Version
 
-1.0.0
+2.0.0

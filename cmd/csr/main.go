@@ -1,5 +1,6 @@
-// Command claude-delete-session deletes a Claude Code session transcript
-// for the current project directory, then hands off to `claude --resume`.
+// Command csr (claude-session-remove) deletes a Claude Code session
+// transcript for the current project directory, then hands off to
+// `claude --resume`.
 //
 // It runs entirely outside Claude Code: no API calls, no tokens spent.
 package main
@@ -12,10 +13,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-isatty"
 )
 
 type session struct {
@@ -33,8 +36,8 @@ type rawEntry struct {
 	} `json:"message"`
 }
 
-// flags for the non-interactive mode used by the /delete-session command
-// running inside Claude Code, where there is no real tty to prompt on.
+// flags for the non-interactive mode used by the /csr command running
+// inside Claude Code, where there is no real tty to drive a TUI on.
 type flags struct {
 	list     bool
 	id       string
@@ -94,9 +97,9 @@ func main() {
 
 	currentID := os.Getenv("CLAUDE_CODE_SESSION_ID")
 
-	// --list: machine-readable dump, no prompts, no deletion. Used by the
-	// /delete-session command to resolve a target without spawning a shell
-	// prompt Claude Code can't answer (it has no attached tty).
+	// --list: machine-readable dump, no prompts, no TUI. Used by the /csr
+	// command to resolve a target without driving a program Claude Code
+	// can't attach a tty to.
 	if f.list {
 		for _, s := range sessions {
 			current := "0"
@@ -109,8 +112,8 @@ func main() {
 	}
 
 	// --id: delete a specific, already-resolved session non-interactively.
-	// Used by the /delete-session command after it has picked a target and
-	// confirmed with the user itself (via AskUserQuestion).
+	// Used by the /csr command after it has picked a target and confirmed
+	// with the user itself (via AskUserQuestion).
 	if f.id != "" {
 		var target *session
 		for i := range sessions {
@@ -122,13 +125,9 @@ func main() {
 		if target == nil {
 			fatal("session id %q not found", f.id)
 		}
-		if !f.yes {
-			prompt := fmt.Sprintf("Delete session %q (%s)? (y/N) ", target.Title, target.Path)
-			answer, _ := promptLine(prompt)
-			if !strings.EqualFold(answer, "y") && !strings.EqualFold(answer, "yes") {
-				fmt.Println("Cancelled.")
-				return
-			}
+		if !f.yes && !confirmPlain(*target) {
+			fmt.Println("Cancelled.")
+			return
 		}
 		deleteAndMaybeResume(*target, currentID, f.noResume)
 		return
@@ -141,20 +140,20 @@ func main() {
 	}
 
 	var chosen session
+	var ok bool
 	if len(matches) == 1 && f.query != "" {
-		chosen = matches[0]
-	} else {
-		idx, ok := pickSession(matches, currentID)
-		if !ok {
-			fmt.Println("Cancelled.")
-			return
+		chosen, ok = matches[0], true
+		if !confirmPlain(chosen) {
+			ok = false
 		}
-		chosen = matches[idx]
+	} else if isatty.IsTerminal(os.Stdout.Fd()) && isatty.IsTerminal(os.Stdin.Fd()) {
+		chosen, ok = runPicker(matches, currentID)
+	} else {
+		// No attached tty (piped/redirected): fall back to a plain,
+		// numbered prompt instead of failing to start the TUI.
+		chosen, ok = pickPlain(matches, currentID)
 	}
-
-	prompt := fmt.Sprintf("Delete session %q (%s)? (y/N) ", chosen.Title, chosen.Path)
-	answer, _ := promptLine(prompt)
-	if !strings.EqualFold(answer, "y") && !strings.EqualFold(answer, "yes") {
+	if !ok {
 		fmt.Println("Cancelled.")
 		return
 	}
@@ -177,10 +176,10 @@ func deleteAndMaybeResume(target session, currentID string, noResume bool) {
 	if err := os.Remove(target.Path); err != nil {
 		fatal("could not delete session: %v", err)
 	}
-	fmt.Println("Session deleted.")
+	fmt.Println(successStyle.Render("✓ Session deleted."))
 
 	if wasCurrent {
-		fmt.Println("This was the active session. Exit this terminal (Ctrl-D) and start a plain 'claude' (not --resume) elsewhere — resuming right now could recreate it under the same id.")
+		fmt.Println(dimStyle.Render("This was the active session. Exit this terminal (Ctrl-D) and start a plain 'claude' (not --resume) elsewhere — resuming right now could recreate it under the same id."))
 		return
 	}
 
@@ -190,7 +189,7 @@ func deleteAndMaybeResume(target session, currentID string, noResume bool) {
 
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
-		fmt.Println("'claude' not found on PATH, skipping resume.")
+		fmt.Println(dimStyle.Render("'claude' not found on PATH, skipping resume."))
 		return
 	}
 
@@ -309,7 +308,44 @@ func filterSessions(sessions []session, query string) []session {
 	return out
 }
 
-func pickSession(sessions []session, currentID string) (int, bool) {
+func relTime(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 2")
+	}
+}
+
+// runPicker drives the Bubble Tea TUI and returns the chosen session, if any.
+func runPicker(sessions []session, currentID string) (session, bool) {
+	m := newModel(sessions, currentID)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	final, err := p.Run()
+	if err != nil {
+		fatal("could not start interface: %v", err)
+	}
+	res := final.(model)
+	if !res.confirmed {
+		return session{}, false
+	}
+	return res.target, true
+}
+
+func confirmPlain(target session) bool {
+	prompt := fmt.Sprintf("Delete session %q (%s)? (y/N) ", target.Title, target.Path)
+	answer, _ := promptLine(prompt)
+	return strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes")
+}
+
+func pickPlain(sessions []session, currentID string) (session, bool) {
 	fmt.Println("Sessions for this project:")
 	for i, s := range sessions {
 		mark := ""
@@ -322,15 +358,19 @@ func pickSession(sessions []session, currentID string) (int, bool) {
 	prompt := fmt.Sprintf("Select a session to delete (1-%d, or Enter to cancel): ", len(sessions))
 	answer, err := promptLine(prompt)
 	if err != nil || answer == "" {
-		return 0, false
+		return session{}, false
 	}
 
-	choice, err := strconv.Atoi(answer)
-	if err != nil || choice < 1 || choice > len(sessions) {
+	var choice int
+	if _, err := fmt.Sscanf(answer, "%d", &choice); err != nil || choice < 1 || choice > len(sessions) {
 		fmt.Println("Invalid selection, aborting.")
 		os.Exit(1)
 	}
-	return choice - 1, true
+	chosen := sessions[choice-1]
+	if !confirmPlain(chosen) {
+		return session{}, false
+	}
+	return chosen, true
 }
 
 func promptLine(prompt string) (string, error) {
